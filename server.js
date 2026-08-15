@@ -116,7 +116,7 @@ async function createGitHubRepository(repoName) {
     method: "POST",
     body: JSON.stringify({
       name: repoName,
-      description: `Site publicado pelo Azion Publisher`,
+      description: "Site publicado pelo Azion Publisher",
       private: isPrivate,
       auto_init: true,
     }),
@@ -143,7 +143,9 @@ async function publishToGitHub(repoName, html) {
     // index.html ainda não existe.
   }
 
-  const content = btoa(unescape(encodeURIComponent(html)));
+  const content = btoa(
+    unescape(encodeURIComponent(html))
+  );
 
   const payload = {
     message: "Publish site",
@@ -237,7 +239,10 @@ async function createWorkload(name, domain) {
   return result.data || result;
 }
 
-async function createWorkloadDeployment(workloadId, applicationId) {
+async function createWorkloadDeployment(
+  workloadId,
+  applicationId
+) {
   const result = await azionRequest(
     `/workspace/workloads/${workloadId}/deployments`,
     {
@@ -259,7 +264,10 @@ async function createWorkloadDeployment(workloadId, applicationId) {
   return result.data || result;
 }
 
-async function createStorageConnector(name, bucketName) {
+async function createStorageConnector(
+  name,
+  bucketName
+) {
   const result = await azionRequest(
     "/edge_connector/connectors",
     {
@@ -279,7 +287,10 @@ async function createStorageConnector(name, bucketName) {
   return result.data || result;
 }
 
-async function createConnectorRule(applicationId, connectorId) {
+async function createConnectorRule(
+  applicationId,
+  connectorId
+) {
   const result = await azionRequest(
     `/edge_application/applications/${applicationId}/request_rules`,
     {
@@ -314,14 +325,22 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
 
-    if (request.method === "GET" && url.pathname === "/") {
+    // Health check
+    if (
+      request.method === "GET" &&
+      url.pathname === "/"
+    ) {
       return json({
         status: "online",
         service: "azion_publisher",
       });
     }
 
-    if (request.method !== "POST" || url.pathname !== "/publish") {
+    // Endpoint de publicação
+    if (
+      request.method !== "POST" ||
+      url.pathname !== "/publish"
+    ) {
       return json(
         {
           error: "Not found",
@@ -331,19 +350,6 @@ export default {
     }
 
     try {
-      const publisherSecret = env("PUBLISHER_SECRET");
-      const receivedSecret =
-        request.headers.get("x-publisher-secret");
-
-      if (!receivedSecret || receivedSecret !== publisherSecret) {
-        return json(
-          {
-            error: "Unauthorized",
-          },
-          401
-        );
-      }
-
       const body = await request.json();
 
       const siteName = body.siteName;
@@ -377,23 +383,32 @@ export default {
       const workloadName = `site-${slug}-${suffix}`;
 
       const domainSuffix =
-        env("AZION_DOMAIN_SUFFIX", false) || "azion.app";
+        env("AZION_DOMAIN_SUFFIX", false) ||
+        "azion.app";
 
       const domain = `${slug}-${suffix}.${domainSuffix}`;
 
-      // 1. Salva o site no GitHub.
-      const github = await publishToGitHub(repoName, html);
-
-      // 2. Cria o bucket Azion.
-      await createAzionBucket(bucketName, html);
-
-      // 3. Cria Application.
-      const application = await createApplication(
-        applicationName
+      // 1. Publicar no GitHub
+      const github = await publishToGitHub(
+        repoName,
+        html
       );
 
+      // 2. Criar bucket e publicar index.html
+      await createAzionBucket(
+        bucketName,
+        html
+      );
+
+      // 3. Criar Application
+      const application =
+        await createApplication(
+          applicationName
+        );
+
       const applicationId =
-        application.id || application.application_id;
+        application.id ||
+        application.application_id;
 
       if (!applicationId) {
         throw new Error(
@@ -403,14 +418,16 @@ export default {
         );
       }
 
-      // 4. Cria Workload.
-      const workload = await createWorkload(
-        workloadName,
-        domain
-      );
+      // 4. Criar Workload
+      const workload =
+        await createWorkload(
+          workloadName,
+          domain
+        );
 
       const workloadId =
-        workload.id || workload.workload_id;
+        workload.id ||
+        workload.workload_id;
 
       if (!workloadId) {
         throw new Error(
@@ -420,17 +437,18 @@ export default {
         );
       }
 
-      // 5. Vincula Workload à Application.
+      // 5. Vincular Workload à Application
       await createWorkloadDeployment(
         workloadId,
         applicationId
       );
 
-      // 6. Cria Connector apontando para o bucket.
-      const connector = await createStorageConnector(
-        `connector-${slug}-${suffix}`,
-        bucketName
-      );
+      // 6. Criar Connector para o Storage
+      const connector =
+        await createStorageConnector(
+          `connector-${slug}-${suffix}`,
+          bucketName
+        );
 
       const connectorId = connector.id;
 
@@ -442,7 +460,7 @@ export default {
         );
       }
 
-      // 7. Faz a Application usar o Connector.
+      // 7. Configurar a Application para usar o Storage
       await createConnectorRule(
         applicationId,
         connectorId
