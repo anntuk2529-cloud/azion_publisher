@@ -1,42 +1,80 @@
-require("dotenv").config();
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
 
-const express = require("express");
-const cors = require("cors");
-
-const app = express();
-
-app.use(cors());
-app.use(express.json({ limit: "50mb" }));
-
-app.get("/", (req, res) => {
-  res.json({
-    status: "online",
-    service: "azion_publisher"
-  });
-});
-
-app.post("/publish", async (req, res) => {
-  try {
-    const { siteName, html } = req.body;
-
-    if (!siteName || !html) {
-      return res.status(400).json({
-        error: "siteName e html são obrigatórios"
-      });
+    if (request.method === "GET" && url.pathname === "/") {
+      return new Response(
+        JSON.stringify({
+          status: "online",
+          service: "azion_publisher",
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json; charset=UTF-8",
+          },
+        }
+      );
     }
 
-    return res.json({
-      success: true,
-      siteName
-    });
+    if (request.method === "POST" && url.pathname === "/publish") {
+      try {
+        const body = await request.json();
 
-  } catch (error) {
-    return res.status(500).json({
-      error: error.message
-    });
-  }
-});
+        const { siteName, html } = body;
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log("azion_publisher iniciado");
-});
+        if (!siteName || !html) {
+          return new Response(
+            JSON.stringify({
+              error: "siteName e html são obrigatórios",
+            }),
+            {
+              status: 400,
+              headers: {
+                "content-type": "application/json; charset=UTF-8",
+              },
+            }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            siteName,
+            message: "Endpoint de publicação funcionando.",
+          }),
+          {
+            status: 200,
+            headers: {
+              "content-type": "application/json; charset=UTF-8",
+            },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: error instanceof Error ? error.message : "Erro interno",
+          }),
+          {
+            status: 500,
+            headers: {
+              "content-type": "application/json; charset=UTF-8",
+            },
+          }
+        );
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        error: "Not found",
+      }),
+      {
+        status: 404,
+        headers: {
+          "content-type": "application/json; charset=UTF-8",
+        },
+      }
+    );
+  },
+};
